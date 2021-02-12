@@ -1,3 +1,4 @@
 gs_interfaces/SatellitesGPS sat
 gs_interfaces/SimpleBatteryState charg
 gs_interfaces/PointGPS position
+uint8 completed

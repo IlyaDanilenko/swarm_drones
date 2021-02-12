@@ -19,6 +19,8 @@ bridge = CvBridge()
 photo = np.array([])
 position = PointGPS()
 
+
+
 def callback_img(data):
     global bridge
     global photo
