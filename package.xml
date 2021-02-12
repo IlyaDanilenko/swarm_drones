@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>swarm_drones</name>
+  <version>1.1.0</version>
+  <description>The swarm_drones package</description>
+
+  <maintainer email="ubuntu@mail.ru">ubuntu</maintainer>
+
+  <license>MIT</license>
+  <buildtool_depend>catkin</buildtool_depend>
+  <build_depend>message_generation</build_depend>
+  <build_depend>message_runtime</build_depend>
+  <exec_depend>message_generation</exec_depend>
+  <exec_depend>message_runtime</exec_depend>
+
+  <export>
+  </export>
+</package>

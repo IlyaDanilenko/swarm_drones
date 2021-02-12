@@ -1,0 +1,4 @@
+<launch>
+    <include file="$(find gs_core)/launch/pioneer.launch"/>
+    <include file="$(find gs_camera)/launch/camera.launch"/>
+</launch>
