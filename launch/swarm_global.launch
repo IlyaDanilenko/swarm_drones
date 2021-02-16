@@ -1,0 +1,4 @@
+<launch>
+    <node pkg="swarm_drones" type="voting_node.py" name="white_voting_node"/>
+    <node pkg="swarm_drones" type="communication_node.py" name="white_communication_node"/>
+</launch>

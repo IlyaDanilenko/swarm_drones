@@ -48,7 +48,8 @@ find_package(catkin REQUIRED
 add_message_files(
     FILES
     Telemetry.msg
- 
+    Array.msg
+    Array_o.msg
 )
 
 ## Generate services in the 'srv' folder

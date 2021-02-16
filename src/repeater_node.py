@@ -14,6 +14,7 @@ rospy.init_node("repeater_node")
 networksNames = ["Geoscan-White", "Geoscan-Blue", "Geoscan-Orange"]
 # subprocess.call("echo connect", shell=True)
 
+low_battery=False
 def connectToWifi(networkId):
     global networksNames
     print("connecting to ", networkId)

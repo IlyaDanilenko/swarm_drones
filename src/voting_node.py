@@ -4,7 +4,8 @@
 import rospy
 from rospy import Publisher, Subscriber
 from rospy import Service, ServiceProxy
-from gs_interfaces.msg import PointGPS
+#from gs_interfaces.msg import PointGPS
+from geometry_msgs.msg import Point
 from gs_interfaces.msg import SimpleBatteryState
 from swarm_drones.msg import Telemetry
 from swarm_drones.srv import VotingResponse, VotingRequest, Voting
@@ -15,25 +16,48 @@ from std_msgs.msg import Int32
 
 v = 5
 batteryForHome=10.5
-
+#position = PointGPS()
+position = Point()
+voit = 0
+telOrange = Telemetry()
+telBlue = Telemetry()
+power = SimpleBatteryState()
+com = 0
+i_repeater=False
 def time(x, y, l, w, v, hr, hw):
     def gipotenuza(a, b):
         return sum(list(map(lambda x: x * x, (a, b)))) ** 0.5
     return ((gipotenuza(l, w)/2 + hr - hw)) / v, gipotenuza(x, y) / v, (gipotenuza(l-x, w-y) + hr - hw) / v # от ретрансятора до дома, от точки до дома, точки до ретранслятора
 def callback_orange(data):
     global telOrange
+    global xo
+    global yo
     telOrange = data
+    xo = telOrange.position.y
+    yo = telOrange.position.x
+    #xo = telOrange.position.latitude
+    #yo = telOrange.position.longitude
 def callback_blue(data):
     global telBlue
     telBlue = data
+    global xb
+    global yb
+    xb = telOrange.position.y
+    yb = telOrange.position.x
+    #xb = telBlue.position.latitude
+    #yb = telBlue.position.longitude
 def callback_pos(data):
     global position
+    global x
+    global y
     position = data
+    x = position.x
+    y = position.y
 def callback_bat(data):
     global power
     power = data
 def handle_otherVoit(req):
-
+    global voit
     global otherVoit
     otherVoit = req.my_voit
 
@@ -49,7 +73,7 @@ def handle_otherVoit(req):
         return 0
 def handle_voti_res(req):
     global voit
-    return VotingResponse(voit) # вставить id коптера
+    return voit # вставить id коптера
 def callback_req(data):
     global com
     com = data
@@ -71,8 +95,12 @@ def handler_take_points(req):
     hw=coord[0][3]
     hr=hw+2
 
+    timeNeed[0] = time(x, y, l, w, v, hr, hw)[2]
+    timeNeed[1] = time(xo, yo, l, w, v, hr, hw)[2]
+    timeNeed[2] = time(xb, yb, l, w, v, hr, hw)[2]
+
 rospy.init_node("voting_node")
-sub_pos = Subscriber("geoscan/navigation/global/position", PointGPS, callback_pos)
+sub_pos = Subscriber("geoscan/navigation/local/position", Point, callback_pos)
 sub_bat = Subscriber("geoscan/battery_state", SimpleBatteryState, callback_bat)
 sub_oran = Subscriber("swarm_drones/orange/telemetry", Telemetry, callback_orange)
 sub_blue = Subscriber("swarm_drones/blue/telemetry", Telemetry, callback_blue)
@@ -82,31 +110,33 @@ pun_repWhite = Subscriber("swarm_drones/white/repeater", Int32, callback_repWhit
 sub_repBlue = Subscriber("swarm_drones/repeater", Int32, callback_repBlue)
 sub_repBlue = Subscriber("swarm_drones/repeater", Int32, callback_repBlue)
 
-service_voit_res = Service("swarm_drones/voit_res", Voti, handle_voti_res)
+service_voit_res = Service("swarm_drones/white/voit_res", Voti, handle_voti_res)
 server_otherVoit = Service("swarm_drones/white/voite", Voting, handle_otherVoit)
 
 voit_orange = ServiceProxy("swarm_drones/orange/voit", Voting)
 voit_blue = ServiceProxy("swarm_drones/blue/voit", Voting)
 change_rep = ServiceProxy("swarm_drones/to_repeater", Repeater)
 
-while not rospy.is_shutdown():
-    x = position.latitude
-    y = position.longitude
-    xo = telOrange.position.lagitude
-    yo = telOrange.position.longitude
-    xb = telBlue.position.latitude
-    yb = telBlue.position.longitude
+powerDrones = [0,0,0]
+timeNeed = [0,0,0]
 
-    powerDrones = []
-    timeNeed = []
+while not rospy.is_shutdown():
+    #x = position.latitude
+    #y = position.longitude
+    #xo = telOrange.position.latitude
+    #yo = telOrange.position.longitude
+    #xb = telBlue.position.latitude
+    #yb = telBlue.position.longitude
+
+
     powerDrones[0] = int(power.charge)
-    powerDrones[1] = int(telOrange.charg)
-    powerDrones[2] = int(telBlue.charg)
-    timeNeed[0] = time(x, y, l, w, v, hr, hw)[2]
-    timeNeed[1] = time(xo, yo, l, w, v, hr, hw)[2]
-    timeNeed[2] = time(xb, yb, l, w, v, hr, hw)[2]
+    powerDrones[1] = int(telOrange.charge.charge)
+    powerDrones[2] = int(telBlue.charge.charge)
+    #timeNeed[0] = time(x, y, l, w, v, hr, hw)[2]
+    #timeNeed[1] = time(xo, yo, l, w, v, hr, hw)[2]
+    #timeNeed[2] = time(xb, yb, l, w, v, hr, hw)[2]
     if com == -1:
-        for i in range(3):
+        for i in range(0,3):
             if max(powerDrones) < batteryForHome:
                 rospy.logwarn("Low Battery all drones")
                 break
