@@ -7,7 +7,7 @@ from rospy import Publisher, Subscriber
 from rospy import Service
 from swarm_drones.srv import Repeater, RepeaterResponse, RepeaterRequest
 from gs_interfaces.msg import SimpleBatteryState
-from std_msgs.msgs import Int32 
+from std_msgs.msg import Int32, Bool
 
 rospy.init_node("repeater_node")
 
@@ -30,23 +30,21 @@ def wifiConnect(req):
         enableHotspot()
     return 1
     # return 192 when complited
-
+def callback_low_battery(data):
+    global low_battery
+    low_battery=data
 """def callback_req(data):
     global com
     com = data"""
 
-def callback_bat(data):
-    global power
-    power = data
 
-sub_bat = Subscriber("geoscan/battery_state", SimpleBatteryState, callback_bat)
-#sub_stateRep = Subscriber("swarm_drones/state_repeater", Int32, callback_req)
+
 pub_stateRep = Publisher("swarm_drones/state_repeater", Int32, queue_size=4)
 proxy = Service("swarm_drones/to_repeater", Repeater, wifiConnect)
-
+sub_low_battery = Subscriber("swarm_drones/white/low_battery", Bool, callback_low_battery)
 
 while not rospy.is_shutdown():
-    if power < 10.5:
+    if low_battery==True:
         pub_stateRep.publish(-1)
     pub_stateRep.publish(0)
     pass

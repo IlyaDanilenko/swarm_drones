@@ -10,18 +10,17 @@ from gs_interfaces.msg import SimpleBatteryState
 from gs_interfaces.msg import SatellitesGPS
 from gs_interfaces.msg import PointGPS
 from swarm_drones.srv import VotingResponse, VotingRequest, Voting
+from swarm_drones.srv import VotiResponse, VotiRequest, Voti
 from swarm_drones.srv import RepeaterRequest, RepeaterResponse, Repeater
+from swarm_drones.srv import PointCloudRequest, PointCloudResponse, PointCloud
 from sensor_msgs.msg import Image
-from std_msgs.msgs import Int32, Int16MultiArray
+from std_msgs.msg import Int32, Float32MultiArray
 satel = SatellitesGPS()
 position = PointGPS()
 power = SimpleBatteryState()
 telOrange = Telemetry()
 telBlue = Telemetry()
 
-l, w = 16, 16 # длина и ширина маршрута (длина прощади съемки) в метрах
-hr, hw = 6, 4 # высота полёта ретранслятора и дронов
-v = 5
 batteryForHome = 10.5 #напряжение возврата домой
 coord=[]#облако точек от оператора
 
@@ -32,10 +31,7 @@ coordinate=[] # массив точек для этого дрона
 
 networksNames = ["Geoscan-White", "Geoscan-Blue", "Geoscan-Orange"]
 
-def time(x, y, l, w, v, hr, hw):
-    def gipotenuza(a, b):
-        return sum(list(map(lambda x: x * x, (a, b)))) ** 0.5
-    return ((gipotenuza(l, w)/2 + hr - hw)) / v, gipotenuza(x, y) / v, (gipotenuza(l-x, w-y) + hr - hw) / v # от ретрансятора до дома, от точки до дома, точки до ретранслятора
+
 def callback_sat(data):
     global satel
     satel = data
@@ -44,134 +40,141 @@ def callback_bat(data):
     power = data
 def callback_pos(data):
     global position
+    global altitude
     position = data
+    if f_start==False:
+        altitude=data.altitude
+        f_start=1
 def callback_stream(data):
     global bridge
     bridge = data
 def callback_comp(data):
     global complet
     complet = data
+def handler_take_points(req):
+    global start_point
+    global coord
+    global n_s
+    global n_route
+    global n
+    global latit
+    global longit
+    global h
+    global ly
+    global lx
+    start_point=req.numStart
+    coord=req.points
+    n_route=req.num_route  # кол-во маршрутов
+    ly=req.ly
+    lx=req.lx
+    
+    latit=coord[0][1]
+    longit=coord[0][2]
+    h=coord[0][2]+altitude
+    n=len(coord) # кол-во снимков всего
+    n_s=n/n_route # кол-во снимков на маршруте
+def callback_out_points_low_bat(data):
+    global points_low_bat
+    points_low_bat=data
+def callback_in_points_blue(data):
+    global in_coord
+    #если он разряжен, то полностью, иначе навстречу но убирая точки которые
+    if charg_blue<10.5 and coordi!=data:
+        coordi=data
+        in_coord=data
+    elif coordi!=data:
+        coordi=data
+        in_coord=data
+        in_coord=in_coord[:len(in_coord)-(len(in_coord)%n_s)]
+def callback_in_points_orange(data):
+    global in_coord
+    #если он разряжен, то полностью, иначе навстречу но убирая точки которые
+    if charg_orange<10.5 and coordi!=data:
+        coordi=data
+        in_coord=data
+    elif coordi!=data:
+        coordi=data
+        in_coord=data
+        in_coord=in_coord[:len(in_coord)-(len(in_coord)%n_s)]
 def callback_orange(data):
-    global telOrange
-    telOrange = data
+    global charg_orange
+    charg_orange=data.charg
 def callback_blue(data):
-    global telBlue
-    telBlue = data
-def callback_repOran(data):
-    global repOran
-    repOran = data
-def callback_repBlue(data):
-    global repBlue
-    repBlue = data
-def handle_otherVoit(req):
-    global otherVoit
-    otherVoit = req.my_voit
-
-    for i in range(3):
-        if max(powerDrones) < batteryForHome:
-            rospy.logwarn("Low_Battery")
-            break
-        elif max(timeNeed) == timeNeed[i]:
-            voit = i
-    if voit == otherVoit:
-        return voit
-    else:
-        return 0
-def callback_repWhite(data):
-    global repWhite
-    repWhite = data    
-def callback_req(data):
-    global com
-    com = data
+    global charg_blue
+    charg_blue=data.charg
 
 rospy.init_node("communication_node")
+
 sub_sat = Subscriber("geoscan/navigation/global/satellites", SatellitesGPS, callback_sat)
 sub_bat = Subscriber("geoscan/battery_state", SimpleBatteryState, callback_bat)
 sub_pos = Subscriber("geoscan/navigation/global/position", PointGPS, callback_pos)
+
 sub_stream = Subscriber("pioneer_max_camera/image_raw", Image, callback_stream)
+sub_out_points_low_bat = Subscriber("swarm_drones/white/out_points_low_bat",Float32MultiArray, callback_out_points_low_bat)
+sub_in_points_low_bat = Subscriber("swarm_drones/blue/in_points", Float32MultiArray, callback_in_points_blue)
+sub_in_points_low_bat = Subscriber("swarm_drones/blue/in_points", Float32MultiArray, callback_in_points_orange)
+
 pub_stream = Publisher("swarm_drones/white/stream", Image, queue_size= len(bridge)+1)
 sub_comp = Subscriber("swarm_drones/white/work_completed", Int32, callback_comp)
-pub_tel = Publisher("swarm_drones/white/telemetry", Telemetry, queue_size=10)
-pun_repWhite = Subscriber("swarm_drones/white/repeater", Int32, callback_repWhite)
-pub_points = Publisher("white/points", Int16MultiArray, queue_size=10)
 sub_oran = Subscriber("swarm_drones/orange/telemetry", Telemetry, callback_orange)
 sub_blue = Subscriber("swarm_drones/blue/telemetry", Telemetry, callback_blue)
-sub_stateRep = Subscriber("swarm_drones/state_repeater", Int32, callback_req)
-pub_stateRep = Publisher("swarm_drones/state_repeater", Int32, queue_size=4)
-sub_repBlue = Subscriber("swarm_drones/repeater", Int32, callback_repBlue)
-voit_orange = ServiceProxy("swarm_drones/orange/voit", Voting)
-voit_blue = ServiceProxy("swarm_drones/blue/voit", Voting)
-change_rep = ServiceProxy("swarm_drones/to_repeater", Repeater)
+pub_tel = Publisher("swarm_drones/white/telemetry", Telemetry, queue_size=10)
 
-x = position.latitude
-y = position.longitude
-xo = telOrange.position.lagitude
-yo = telOrange.position.longitude
-xb = telBlue.position.latitude
-yb = telBlue.position.longitude
+pub_points = Publisher("swarm_drones/white/points", Float32MultiArray, queue_size=10)
+pub_in_points_low_bat = Publisher("swarm_drones/white/in_points_low_bat",Float32MultiArray,queue_size=len(in_coord))
+proxy_voit_res = ServiceProxy("swarm_drones/voit_res", Voti)
+service = Service("swarm_drones/take_points", PointCloud, handler_take_points)
 
-powerDrones = []
-timeNeed = []
-powerDrones[0] = int(power.charge)
-powerDrones[1] = int(telOrange.charg)
-powerDrones[2] = int(telBlue.charg)
-timeNeed[0] = time(x, y, l, w, v, hr, hw)[2]
-timeNeed[1] = time(xo, yo, l, w, v, hr, hw)[2]
-timeNeed[2] = time(xb, yb, l, w, v, hr, hw)[2]
-
-for i in range(3):
-    if max(powerDrones) < batteryForHome:
-        rospy.logwarn("Low_Battery")
-        break
-    elif min(timeNeed) == timeNeed[i]:
-        voit = i
-if voit == 0:
-    i_repeater = True
-
-if i_repeater: # 0 для белого, 1 для голубого, 3 для оранжевого
-    lat=l/2
-    lon=w/2
-    coordinate.append([0, 0, hr])
-    coordinate.append([lat, lon, hr])
-else: # берём ближнию территорию только белый
-    if n_route%2==0: # чётность не чётность маршрутов
-        par_route=1
-    else:
-        par_route=0
-
-    if par_route==1: # выбор нужных точек из облака
-        route=n_route/2+1
-        dots=n_s*route
-        i=0
-        while i<dots:
-            coordinate.append(coord[i])
-            i=i+1
-    elif par_route==0:
-        route=round(n_route/2)
-        dots=n_s*route
-        i=0
-        while i<dots:
-            coordinate.append(coord[i])
-            i=i+1
-
-server_otherVoit = Service("white/voite", Voting, handle_otherVoit)
 
 while not rospy.is_shutdown():
-    voited = VotingRequest()
-    comRep = RepeaterRequest()
-    voited.my_voit = voit
-    if com == -1: 
-        if voit_blue(voit) == voit and voit_orange(voit) == voit and i_repeater:
-            sub_stateRep.unregister()
-        comRep.commande = 1
-        comRep.id = voit
-        change_rep(comRep)  
+    voit=proxy_voit_res()
+    for i in range(len(coord)):# замена на абсолютную высоту
+        coord[i][2]=h
+        i+=1
+    if voit.num==0: # 0 для белого, 1 для голубого, 3 для оранжевого
+        if start_point==1:
+            lat=latit+ly/2
+            lon=longit+lx/2
+        elif start_point==2:
+            lat=latit-ly/2
+            lon=longit+lx/2
+        elif start_point==3:
+            lat=latit+ly/2
+            lon=longit-lx/2
+        elif start_point==4:
+            lat=latit-ly/2
+            lon=longit-lx/2
+        coordinate.append([0, 0, h+2])
+        coordinate.append([lat, lon, h+2])
+    else: # берём ближнию территорию здесь только белый
+        
+        if n_route%2==0: # чётность не чётность маршрутов
+            par_route=1
+        else:
+            par_route=0
+
+        if par_route==1: # выбор нужных точек из облака
+            route=n_route/2+1
+            dots=n_s*route
+            i=0
+            while i<dots:
+                coordinate.append(coord[i])
+                i=i+1
+        elif par_route==0:
+            route=round(n_route/2)
+            dots=n_s*route
+            i=0
+            while i<dots:
+                coordinate.append(coord[i])
+                i=i+1
     tel = Telemetry()
     stream = Image() 
+    tel.completed=complet
     tel.charg = power
     tel.position = position
     tel.sat = satel
     pub_tel.publish(tel)
+    pub_in_points_low_bat.publish(in_coord)
     pub_stream.publish(stream)
     pub_points.publish(coordinate)
     sleep(1)

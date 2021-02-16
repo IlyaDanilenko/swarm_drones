@@ -13,6 +13,8 @@ from sensor_msgs.msg import Image
 from PIL import Image as ImagePIL
 import piexif
 import math
+import pickle
+import os.path
 
 rospy.init_node("camera_control_node")
 bridge = CvBridge()
@@ -46,12 +48,28 @@ def pioneer2exif(data):
     s = math.modf(sd)[1]
     return int(d), int(m), int(s)
 
+currentPhotoCnt = -1
+# photo cnt
 def handle_photo(req):
     global photo
     global position
+    global currentPhotoCnt
+
+    if currentPhotoCnt == -1:
+        try:
+            with  open( "/home/ubuntu/geoscan_ws/currPhotoCntSAVE.pickle", "rb" ) as f:
+                currentPhotoCnt = pickle.load(f) + 1
+        except:
+            currentPhotoCnt = 0
+        if not os.path.exists("/home/ubuntu/geoscan_ws/photo/geoscan_0.jpg"):
+            currentPhotoCnt = 0
+            with open( "/home/ubuntu/geoscan_ws/currPhotoCntSAVE.pickle", "wb" ) as f:
+                pickle.dump(currentPhotoCnt, f )
+
     try:
-        cv2.imwrite("name.jpg",photo)
-        print(position)
+        cv2.imwrite("/home/ubuntu/geoscan_ws/photo/geoscan_{}.jpg".format(currentPhotoCnt),photo)
+        with open( "currPhotoCntSAVE.pickle", "wb" ) as f:
+            pickle.dump(currentPhotoCnt, f)
         lat_1, lat_2, lat_3 = pioneer2exif(position.latitude)
         lon_1, lon_2, lon_3 = pioneer2exif(position.longitude)
         gps_ifd = {
@@ -69,7 +87,8 @@ def handle_photo(req):
         }
 
         exif_dict = {"0th":zero,"GPS":gps_ifd}
-        piexif.insert(piexif.dump(exif_dict),"name.jpg")
+        piexif.insert(piexif.dump(exif_dict),"/home/ubuntu/geoscan_ws/photo/geoscan_{}.jpg".format(currentPhotoCnt))
+        currentPhotoCnt = currentPhotoCnt + 1
         return TakeScreenResponse(1)
     except Exception as e:
         print(str(e))

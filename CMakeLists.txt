@@ -57,6 +57,8 @@ add_service_files(
     TakeScreen.srv
     Voting.srv
     Repeater.srv
+    Voti.srv
+    PointCloud.srv
 )
 
 ## Generate actions in the 'action' folder

@@ -1,4 +1,9 @@
 <launch>
     <include file="$(find gs_core)/launch/pioneer.launch"/>
     <include file="$(find gs_camera)/launch/camera.launch"/>
+    <node pkg="swarm_drones" type="camera_control_node.py" name="camera_control_node"/>
+    <node pkg="swarm_drones" type="repeater_node.py" name="repeater_node"/>
+    <node pkg="swarm_drones" type="voting_node.py" name="voting_node"/>
+    <node pkg="swarm_drones" type="communication_node.py" name="communication_node"/>
+    <node pkg="swarm_drones" type="main_node.py" name="main_node"/>
 </launch>
