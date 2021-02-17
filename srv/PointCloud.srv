@@ -1,4 +1,4 @@
-std_msgs/Float32MultiArray points
+swarm_drones/Array points
 uint8 numStart
 uint16 num_rout
 uint16 lx
