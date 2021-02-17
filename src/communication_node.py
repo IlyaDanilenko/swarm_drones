@@ -6,7 +6,7 @@ from time import sleep
 from rospy import Publisher, Subscriber
 from rospy import Service, ServiceProxy
 from swarm_drones.msg import Telemetry
-from swarm_drones.msg import Array
+from swarm_drones.msg import Array, Array_o
 from gs_interfaces.msg import SimpleBatteryState
 from gs_interfaces.msg import SatellitesGPS
 #from gs_interfaces.msg import PointGPS
@@ -31,7 +31,7 @@ coord=[]#облако точек от оператора
 n_s=0 # кол-во снимков на маршруте
 n_route=0 # кол-во маршрутов
 n=0 # кол-во снимков в облаке
-coordinate=[] # массив точек для этого дрона
+# coordinate= Array() # массив точек для этого дрона
 
 networksNames = ["Geoscan-White", "Geoscan-Blue", "Geoscan-Orange"]
 
@@ -74,21 +74,22 @@ def handler_take_points(req):
     global h
     global ly
     global lx
+    coordinate = []
     start_point=req.numStart
     coord=req.points
     n_route=req.num_route  # кол-во маршрутов
     ly=req.ly
     lx=req.lx
-    latit=coord[0][1]
-    longit=coord[0][2]
-    h=coord[0][2] #+altitude убрать если gps
-    n=len(coord) # кол-во снимков всего
+    latit=coord.data[0].data[1]
+    longit=coord.data[0].data[2]
+    h=coord.data[0].data[2] #+altitude убрать если gps
+    n=len(coord.data) # кол-во снимков всего
     n_s=n/n_route # кол-во снимков на маршруте
 
-    for i in range(len(coord)):# замена на абсолютную высоту
-        coord[i][2]=h
+    for i in range(len(coord.data)):# замена на абсолютную высоту
+        coord[i].data[2].data=h
         i+=1
-    if voit.num==0 and len(coord)>0: # 0 для белого, 1 для голубого, 3 для оранжевого
+    if voit.num==0 and len(coord.data)>0: # 0 для белого, 1 для голубого, 3 для оранжевого
         if start_point==1:
             lat=latit+ly/2
             lon=longit+lx/2
@@ -101,7 +102,7 @@ def handler_take_points(req):
         elif start_point==4:
             lat=latit-ly/2
             lon=longit-lx/2
-        coordinate.append([coord[0][0], coord[0][1], h+2])
+        coordinate.append([coord[0].data[0].data, coord.data[0].data[1], h+2])
         coordinate.append([lat, lon, h+2])
     elif (voit.num==1 or voit.num==2) and len(coord)>0: # берём ближнию территорию здесь только белый
         if n_route%2==0: # чётность не чётность маршрутов
@@ -114,14 +115,14 @@ def handler_take_points(req):
             dots=n_s*route
             i=0
             while i<dots:
-                coordinate.append(coord[i])
+                coordinate.append(coord.data[i])
                 i=i+1
         elif par_route==0:
             route=round(n_route/2)
             dots=n_s*route
             i=0
             while i<dots:
-                coordinate.append(coord[i])
+                coordinate.append(coord.data[i])
                 i=i+1
     pub_points.publish(coordinate)
 def callback_out_points_low_bat(data):
